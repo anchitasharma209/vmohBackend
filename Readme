@@ -1,0 +1,18 @@
+# VMOH Backend
+
+This is the backend server for the VMOH project, implemented using Node.js and Express.js. It uses Mongoose to interact with the database.
+
+## Getting Started
+
+To set up and run the project locally, follow these steps:
+- Clone this repository to your local machine.
+- Run `npm install` to install the project dependencies.
+
+## Running the Server
+
+To start the server, run:
+`npm run dev`
+
+## For Future Reference
+
+No `.env` is being used up until now; configuration will be implemented later on.
