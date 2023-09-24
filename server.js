@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 const app = express();
 
 // DATABASE CONNECTIONS
@@ -19,6 +20,7 @@ mongoose
   });
 
 app.use(express.json());
+app.use(cors({ origin: true }));
 const port = process.env.PORT || 8081;
 
 const user = require("./routes/userRoutes");

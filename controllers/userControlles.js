@@ -137,57 +137,68 @@ exports.verifyOtp = async (req, res) => {
 };
 
 // Login API with username AS phone number and matching password from Database
-exports.login = (req, res) => {
-  const { phoneNumber, password } = req.body;
+exports.login = async (req, res) => {
+  const { credential, password } = req.body;
 
-  Users.findOne({ phoneNumber })
-    .then((user) => {
-      if (!user) {
-        return res.status(404).send({
-          status: false,
-          message: "User not found",
-        });
-      }
+  // Checking if credential provided in body is email format or not
+  const isEmail = /^\S+@\S+\.\S+$/.test(credential);
+  try {
+    let user;
 
-      if (user.password !== password) {
-        return res.status(401).send({
-          status: false,
-          message: "Invalid password",
-        });
-      }
+    // Finding user based on email or phoneNumber
+    if (isEmail) {
+      user = await Users.findOne({ email: credential });
+    } else {
+      user = await Users.findOne({ phoneNumber: credential });
+    }
 
-      // Generate and send JWT token
-      const token = jwt.sign(
-        {
-          id: user._id,
-          companyName: user.companyName,
-          phoneNumber: user.phoneNumber,
-        },
-        secretKey,
-        { expiresIn: "2h" }
-      );
-      return res.status(200).send({
-        status: true,
-        message: "Login successful",
-        data: {
-          id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phoneNumber: user.phoneNumber,
-          companyName: user.companyName,
-        },
-        token,
-      });
-    })
-    .catch((err) => {
-      return res.status(500).send({
+    // Check if a user with the provided email or phoneNumber exists
+    if (!user) {
+      return res.status(404).json({
         status: false,
-        message: err.message,
+        message: "User not found.",
       });
+    }
+
+    // Password matching
+    if (user.password !== password) {
+      return res.status(401).send({
+        status: false,
+        message: "Invalid password",
+      });
+    }
+
+    // Generate and send JWT token
+    const token = jwt.sign(
+      {
+        id: user._id,
+        companyName: user.companyName,
+        phoneNumber: user.phoneNumber,
+      },
+      secretKey,
+      { expiresIn: "2h" }
+    );
+    return res.status(200).send({
+      status: true,
+      message: "Login successful",
+      data: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        companyName: user.companyName,
+      },
+      token,
     });
+  } catch (err) {
+    return res.status(500).json({
+      status: false,
+      message: err.message,
+    });
+  }
 };
 
-// reseting password by phoneNumber
+// Reseting password by phoneNumber
 exports.resetPassword = async (req, res) => {
   const phoneNumber = req.body.phoneNumber;
 
