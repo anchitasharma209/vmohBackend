@@ -7,6 +7,8 @@ const secretKey =
   "eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTY5NTQ1OTAyMiwiaWF0IjoxNjk1NDU5MDIyfQ.AV9LAkze8oxNJR9yv4oHb2geqvne4a6aKoHTXXxpl1g";
 const { generateOTP } = require("../utils/otp");
 const { sendSMS } = require("../utils/sms");
+const sendEmail = require("../utils/email");
+const crypto = require("crypto");
 
 // SIGN UP API creating new users
 exports.signUp = async (req, res) => {
@@ -198,8 +200,8 @@ exports.login = async (req, res) => {
   }
 };
 
-// Reseting password by phoneNumber
-exports.resetPassword = async (req, res) => {
+// Reseting password by phoneNumber (NOT WOKRING)
+exports.resetPasswordss = async (req, res) => {
   const phoneNumber = req.body.phoneNumber;
 
   const user = await Users.findOne({ phoneNumber: phoneNumber });
@@ -222,8 +224,8 @@ exports.resetPassword = async (req, res) => {
   });
 };
 
-// Update Password after matching OTP that is sent at the time of passwrod resetting
-exports.updatePassword = (req, res) => {
+// Update Password after matching OTP that is sent at the time of passwrod resetting(NOT WORKING)
+exports.updatePasswordsss = (req, res) => {
   const phoneNumber = req.body.phoneNumber;
   Users.updateOne(
     { phoneNumber: phoneNumber },
@@ -344,6 +346,208 @@ exports.getProfile = (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({
+      status: false,
+      message: err.message,
+    });
+  }
+};
+
+// Reset Password API which sends link to the user email address.
+exports.resetPassword = (req, res) => {
+  try {
+    const email = req.body.email;
+    Users.findOne({ email: email })
+      .then((user) => {
+        if (!user) {
+          return res.status(404).send({
+            status: false,
+            message: "User not found",
+          });
+        }
+        const token = jwt.sign({ _id: user._id, email }, secretKey, {
+          expiresIn: "10m",
+        });
+
+        // save user token
+        var link = `${req.protocol}://${req.get("host")}/api/v1/reset-password/${user._id}/${token}`;
+        const textHtml = `Click <a href = ${link}> Here </a> to reset your password ,If it doesn't work then click on the side link <br> ${link}`;
+        const textMsg = `Or click on the side link to reset your password ${link}`;
+        console.log(link);
+        // sending email code
+        var mailOptions = {
+          email: `${email}`,
+          subject: "VMOH - Reset password",
+          textHtml: textHtml,
+          message: textMsg,
+        };
+        sendEmail(mailOptions, function (error, info) {
+          if (error) {
+            console.log(error);
+          } else {
+            console.log("Email sent: " + info.response);
+          }
+        });
+
+        return res.status(200).send({
+          status: true,
+          message: "Please check your email and reset password.",
+          token: token,
+        });
+      })
+      .catch((err) => {
+        return res.status(500).send({
+          status: false,
+          message: err.message,
+        });
+      });
+  } catch (err) {
+    return res.status(500).send({
+      status: false,
+      message: "Catch Exception -" + err.message,
+    });
+  }
+};
+
+exports.resetPasswordToken = async (req, res) => {
+  const { token, id } = req.params;
+
+  const oldUser = await Users.findOne({ _id: id });
+  if (!oldUser) {
+    return res.status(401).send({
+      status: false,
+      message: "No user Exists",
+    });
+  }
+  try {
+    const verify = jwt.verify(token, secretKey);
+    if (!verify) {
+      return res.status(401).send({
+        status: false,
+        message: "Not authorized",
+      });
+    } else {
+      res.render("index", { email: verify.email });
+    }
+  } catch (err) {
+    return res.status(500).send({
+      status: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.updatePassword = async (req, res) => {
+  const { id, token } = req.params;
+  const { password, confirmPassword } = req.body;
+  if (!password) {
+    return res.status(401).send({
+      status: false,
+      message: "Password Should not Empty",
+    });
+  }
+
+  const oldUser = await Users.findOne({ _id: id });
+  if (password === oldUser.password) {
+    return res.status(401).send({
+      status: false,
+      message: "Password Should not be same as old Password",
+    });
+  }
+  try {
+    const verify = jwt.verify(token, secretKey);
+
+    if (!verify) {
+      return res.status(401).send({
+        status: false,
+        message: "Not authorized",
+      });
+    } else {
+      const updatedUser = await Users.updateOne(
+        { _id: id },
+        { $set: { password: password } }
+      );
+      if (updatedUser.modifiedCount === 0) {
+        return res.status(404).send({
+          status: false,
+          message: "Error Changing Password",
+        });
+      } else {
+        res.render("passwordUpdated", { email: verify.email });
+      }
+    }
+  } catch (err) {
+    return res.status(500).send({
+      status: false,
+      message: err.message,
+    });
+  }
+};
+
+/**
+ *  NOT USING BELOW APIS
+ */
+
+// reseting password
+exports.forgotPassword = async (req, res, next) => {
+  //1 get user based on posted email
+  const user = await Users.findOne({ email: req.body.email });
+  if (!user) {
+    return res.status(404).send({
+      message: "User Not Found",
+    });
+  }
+  //2 create a random reset token
+  const resetToken = user.createResetPasswordToken();
+  await user.save();
+  //3 send the token back to user email
+  const resetUrl = `${req.protocol}://${req.get(
+    "host"
+  )}/api/v1/users/resetPassword/${resetToken}`;
+  const message = `Please use the below link to reset your password\n\n${resetUrl}\n\n This reset Password link will be valid for 10 minutes`;
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Password changes request recieved",
+      message: message,
+    });
+    res.status(200).json({
+      status: "Success",
+      message: "Password reset link send to user email",
+    });
+  } catch (err) {
+    user.passwordResetToken = undefined;
+    user.passwordResetTokenExpired = undefined;
+    user.save({ validateBeforeSave: false });
+
+    return res.status(500).send({
+      message: "There was an error sending message",
+    });
+  }
+};
+
+exports.resetPasswordTokens = async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  const oldUser = await Users.findOne({ _id: id });
+  if (!oldUser) {
+    return res.status(401).send({
+      status: false,
+      message: "No user Exists",
+    });
+  }
+  try {
+    const verify = jwt.verify(token, secretKey);
+    if (!verify) {
+      return res.status(401).send({
+        status: false,
+        message: "Not authorized",
+      });
+    } else {
+      res.render("index", { email: verify.email });
+    }
+  } catch (err) {
+    return res.status(500).send({
       status: false,
       message: err.message,
     });

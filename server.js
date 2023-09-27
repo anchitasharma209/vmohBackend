@@ -1,4 +1,5 @@
 const express = require("express");
+const bodyParser = require('body-parser');
 const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
@@ -18,9 +19,12 @@ mongoose
   .catch((error) => {
     console.log(`connection error: ${error}`);
   });
-
+  app.set('view engine','ejs')
 app.use(express.json());
 app.use(cors({ origin: true }));
+
+// Use body-parser middleware to parse form data
+app.use(bodyParser.urlencoded({ extended: false }));
 const port = process.env.PORT || 8081;
 
 const user = require("./routes/userRoutes");
