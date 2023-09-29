@@ -140,37 +140,87 @@ exports.verifyOtp = async (req, res) => {
 
 // Login API with username AS phone number and matching password from Database
 exports.login = async (req, res) => {
-  const { credential, password } = req.body;
+  // const { credential, password } = req.body;
 
-  // Checking if credential provided in body is email format or not
-  const isEmail = /^\S+@\S+\.\S+$/.test(credential);
-  try {
-    let user;
+  // // Checking if credential provided in body is email format or not
+  // const isEmail = /^\S+@\S+\.\S+$/.test(credential);
+  // try {
+  //   let user;
 
-    // Finding user based on email or phoneNumber
-    if (isEmail) {
-      user = await Users.findOne({ email: credential });
-    } else {
-      user = await Users.findOne({ phoneNumber: credential });
-    }
+  //   // Finding user based on email or phoneNumber
+  //   if (isEmail) {
+  //     user = await Users.findOne({ email: credential });
+  //   } else {
+  //     user = await Users.findOne({ phoneNumber: credential });
+  //   }
+  //   //const isMatch = await user.comparePasswordInDB(password,user.password)
 
-    // Check if a user with the provided email or phoneNumber exists
-    if (!user) {
-      return res.status(404).json({
-        status: false,
-        message: "User not found.",
-      });
-    }
+  //   // Check if a user with the provided email or phoneNumber exists
+  //   if (!user || !(await user.comparePasswordInDB(password,user.password))) {
+  //     return res.status(404).json({
+  //       status: false,
+  //       message: "User not found.",
+  //     });
+  //   }
 
-    // Password matching
-    if (user.password !== password) {
-      return res.status(401).send({
-        status: false,
-        message: "Invalid password",
-      });
-    }
+  //   // Password matching
+  //   if (user.password !== password) {
+  //     return res.status(401).send({
+  //       status: false,
+  //       message: "Invalid password",
+  //     });
+  //   }
 
-    // Generate and send JWT token
+  //   // Generate and send JWT token
+  //   const token = jwt.sign(
+  //     {
+  //       id: user._id,
+  //       companyName: user.companyName,
+  //       phoneNumber: user.phoneNumber,
+  //     },
+  //     secretKey,
+  //     { expiresIn: "2h" }
+  //   );
+  //   return res.status(200).send({
+  //     status: true,
+  //     ,message: "Login successful"
+  //     data: {
+  //       firstName: user.firstName,
+  //       lastName: user.lastName,
+  //       email: user.email,
+  //       phoneNumber: user.phoneNumber,
+  //       companyName: user.companyName,
+  //     },
+  //     token,
+  //   });
+  // } catch (err) {
+  //   return res.status(500).json({
+  //     status: false,
+  //     message: err.message,
+  //   });
+  // }
+  const phoneNumber = req.body.phoneNumber;
+  const password = req.body.password;
+  
+  //check if phone number and password present in request body
+  if(!phoneNumber || !password){
+    return res.status(400).json({
+      status:false,
+      message:"Please provide phone number and password for login"
+    })
+  }
+
+  //checkif user exist with given phone number
+  const user = await Users.findOne({ phoneNumber }).select('+password');
+  await user.comparePasswordInDB(password,user.password)
+  //check if user exist & pasword matches
+  if(!user || !(await user.comparePasswordInDB(password,user.password))){
+    return res.status(400).json({
+      status:'false',
+      message:"Incorrect phone number or password"
+    })
+  }
+  // Generate and send JWT token
     const token = jwt.sign(
       {
         id: user._id,
@@ -180,24 +230,15 @@ exports.login = async (req, res) => {
       secretKey,
       { expiresIn: "2h" }
     );
-    return res.status(200).send({
-      status: true,
-      message: "Login successful",
-      data: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        companyName: user.companyName,
-      },
-      token,
-    });
-  } catch (err) {
-    return res.status(500).json({
-      status: false,
-      message: err.message,
-    });
-  }
+
+
+
+  res.status(200).json({
+    status:'success',
+    message: "Login successful",
+    token,
+    user
+  })
 };
 
 // Reseting password by phoneNumber (NOT WOKRING)
