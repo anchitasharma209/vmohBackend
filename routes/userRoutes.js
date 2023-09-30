@@ -6,9 +6,9 @@ const verifyToken = require("../middlewares/auth");
 router.post("/signup", users.signUp);
 router.post("/login", users.login);
 router.post("/verifyotp", users.verifyOtp);
-router.post("/reset-password", users.resetPassword); 
-router.get("/reset-password/:id/:token", users.resetPasswordToken); 
-router.post("/reset-password/:id/:token", users.updatePassword); 
+router.post("/forgot-password", users.forgotPassword); 
+//router.get("/reset-password/:id/:token", users.resetPasswordToken); 
+router.patch("/reset-password/:token", users.resetPassword); 
 // not using
 router.post("/generateotp", users.generateOtp);
 

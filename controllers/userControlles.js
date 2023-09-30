@@ -7,7 +7,7 @@ const secretKey =
   "eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTY5NTQ1OTAyMiwiaWF0IjoxNjk1NDU5MDIyfQ.AV9LAkze8oxNJR9yv4oHb2geqvne4a6aKoHTXXxpl1g";
 const { generateOTP } = require("../utils/otp");
 const { sendSMS } = require("../utils/sms");
-const sendEmail = require("../utils/email");
+const sendEmail = require("./../utils/email");
 const crypto = require("crypto");
 
 // SIGN UP API creating new users
@@ -394,60 +394,60 @@ exports.getProfile = (req, res) => {
 };
 
 // Reset Password API which sends link to the user email address.
-exports.resetPassword = (req, res) => {
-  try {
-    const email = req.body.email;
-    Users.findOne({ email: email })
-      .then((user) => {
-        if (!user) {
-          return res.status(404).send({
-            status: false,
-            message: "User not found",
-          });
-        }
-        const token = jwt.sign({ _id: user._id, email }, secretKey, {
-          expiresIn: "10m",
-        });
+// exports.resetPassword = (req, res) => {
+//   try {
+//     const email = req.body.email;
+//     Users.findOne({ email: email })
+//       .then((user) => {
+//         if (!user) {
+//           return res.status(404).send({
+//             status: false,
+//             message: "User not found",
+//           });
+//         }
+//         const token = jwt.sign({ _id: user._id, email }, secretKey, {
+//           expiresIn: "10m",
+//         });
 
-        // save user token
-        var link = `${req.protocol}://${req.get("host")}/api/v1/reset-password/${user._id}/${token}`;
-        const textHtml = `Click <a href = ${link}> Here </a> to reset your password ,If it doesn't work then click on the side link <br> ${link}`;
-        const textMsg = `Or click on the side link to reset your password ${link}`;
-        console.log(link);
-        // sending email code
-        var mailOptions = {
-          email: `${email}`,
-          subject: "VMOH - Reset password",
-          textHtml: textHtml,
-          message: textMsg,
-        };
-        sendEmail(mailOptions, function (error, info) {
-          if (error) {
-            console.log(error);
-          } else {
-            console.log("Email sent: " + info.response);
-          }
-        });
+//         // save user token
+//         var link = `${req.protocol}://${req.get("host")}/api/v1/reset-password/${user._id}/${token}`;
+//         const textHtml = `Click <a href = ${link}> Here </a> to reset your password ,If it doesn't work then click on the side link <br> ${link}`;
+//         const textMsg = `Or click on the side link to reset your password ${link}`;
+//         console.log(link);
+//         // sending email code
+//         var mailOptions = {
+//           email: `${email}`,
+//           subject: "VMOH - Reset password",
+//           textHtml: textHtml,
+//           message: textMsg,
+//         };
+//         sendEmail(mailOptions, function (error, info) {
+//           if (error) {
+//             console.log(error);
+//           } else {
+//             console.log("Email sent: " + info.response);
+//           }
+//         });
 
-        return res.status(200).send({
-          status: true,
-          message: "Please check your email and reset password.",
-          token: token,
-        });
-      })
-      .catch((err) => {
-        return res.status(500).send({
-          status: false,
-          message: err.message,
-        });
-      });
-  } catch (err) {
-    return res.status(500).send({
-      status: false,
-      message: "Catch Exception -" + err.message,
-    });
-  }
-};
+//         return res.status(200).send({
+//           status: true,
+//           message: "Please check your email and reset password.",
+//           token: token,
+//         });
+//       })
+//       .catch((err) => {
+//         return res.status(500).send({
+//           status: false,
+//           message: err.message,
+//         });
+//       });
+//   } catch (err) {
+//     return res.status(500).send({
+//       status: false,
+//       message: "Catch Exception -" + err.message,
+//     });
+//   }
+// };
 
 exports.resetPasswordToken = async (req, res) => {
   const { token, id } = req.params;
@@ -524,47 +524,90 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
-/**
- *  NOT USING BELOW APIS
- */
+
 
 // reseting password
-exports.forgotPassword = async (req, res, next) => {
+exports.forgotPassword = async (req,res,next)=>{
   //1 get user based on posted email
-  const user = await Users.findOne({ email: req.body.email });
-  if (!user) {
-    return res.status(404).send({
-      message: "User Not Found",
-    });
-  }
-  //2 create a random reset token
-  const resetToken = user.createResetPasswordToken();
-  await user.save();
-  //3 send the token back to user email
-  const resetUrl = `${req.protocol}://${req.get(
-    "host"
-  )}/api/v1/users/resetPassword/${resetToken}`;
-  const message = `Please use the below link to reset your password\n\n${resetUrl}\n\n This reset Password link will be valid for 10 minutes`;
-  try {
-    await sendEmail({
-      email: user.email,
-      subject: "Password changes request recieved",
-      message: message,
-    });
-    res.status(200).json({
-      status: "Success",
-      message: "Password reset link send to user email",
-    });
-  } catch (err) {
-    user.passwordResetToken = undefined;
-    user.passwordResetTokenExpired = undefined;
-    user.save({ validateBeforeSave: false });
+ const user = await Users.findOne({email:req.body.email})
+ if(!user){
+  return res.status(404).send({
+    message:"User Not Found"
+  })
+ }
+//2 create a random reset token
+ const resetToken = user.createResetPasswordToken();
+ await user.save({validateBeforeSave:false});
 
-    return res.status(500).send({
-      message: "There was an error sending message",
-    });
+ //3 send the token back to user email
+ const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/users/reset-password/${resetToken}`
+ 
+ const message = `Please use the below link to reset your password\n\n${resetUrl}\n\nThis reset Password link will be valid for 10 minutes`
+ //console.log(message);
+try{
+
+await sendEmail({
+  email:user.email,
+  subject: "Password changes request recieved",
+  message: message
+  });
+
+  res.status(200).json({
+  status:"Success",
+  message:"Password reset link send to user email",
+  user
+ })
+}
+catch(err){
+  user.passwordResetToken = undefined;
+  user.passwordResetTokenExpires = undefined;
+  user.save({validateBeforeSave:false});
+
+
+  return res.status(500).send({
+    message:"There was an error sending message"
+  })
+}
+}
+exports.resetPassword = async (req, res) => {
+  const token = crypto.createHash('sha256').update(req.params.token).digest('hex')
+  const user = await Users.findOne({passwordResetToken:token, passwordResetTokenExpires:{$gt:Date.now()} });
+
+  if(!user){
+    return res.status(400).send({
+      message:"Token is invalid or has expired"
+    })
   }
-};
+  //resetting the password
+  user.password = req.body.password;
+  user.confirmPassword = req.body.confirmPassword;
+  // Clear reset token fields
+  user.passwordResetToken = undefined;
+  user.passwordResetTokenExpires = undefined;
+  
+  user.save();
+   // login the user
+  const loginToken = jwt.sign(
+    {
+      id: user._id,
+      companyName: user.companyName,
+      phoneNumber: user.phoneNumber,
+    },
+    secretKey,
+    { expiresIn: "2h" }
+  );
+  return res.status(200).send({
+    status:"true",
+    message:"Login successful",
+    user,
+    token:loginToken
+
+  })
+
+
+
+
+}
 
 exports.resetPasswordTokens = async (req, res) => {
   const { token } = req.params;

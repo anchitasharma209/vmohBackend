@@ -20,12 +20,13 @@ const userSchema = new mongoose.Schema(
       message:'Password and confirm password does not match'
     }
     },
+    passwordResetToken:String,
+    passwordResetTokenExpires:Date,
     otp: { type: String },
     otpExpiration: { type: Date },
     status: { type: Boolean, default: false },
     deleted: { type: Boolean, default: false },
-    token:{resetPasswordToken:{type: String},
-    resetPasswordExpires:{type: Date}}
+    
   },
   { timestamps: true }
 );
@@ -42,17 +43,14 @@ userSchema.methods.comparePasswordInDB = async function(pswd,pswdDB){
  return await bcrypt.compare(pswd,pswdDB);
 }
 
-userSchema.methods.createResetPasswordToken = function () {
-  const resetToken = crypto.randomBytes(64).toString("hex");
-  this.passwordResetToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
-  this.passwordResetTokenExpired = Date.now() + 10 * 60 * 1000;
-  console.log(resetToken, this.passwordResetToken);
+userSchema.methods.createResetPasswordToken = function(){
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.passwordResetToken=crypto.createHash("sha256").update(resetToken).digest("hex");
+  this.passwordResetTokenExpires = Date.now() + 10*60*1000;
+  console.log(resetToken,this.passwordResetToken);
 
   return resetToken;
-};
+}
 const Users = mongoose.model("User", userSchema);
 
 module.exports = Users;
