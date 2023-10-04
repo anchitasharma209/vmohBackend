@@ -199,25 +199,25 @@ exports.login = async (req, res) => {
   //     message: err.message,
   //   });
   // }
-  const phoneNumber = req.body.phoneNumber;
+  const email = req.body.email;
   const password = req.body.password;
   
   //check if phone number and password present in request body
-  if(!phoneNumber || !password){
+  if(!email || !password){
     return res.status(400).json({
       status:false,
-      message:"Please provide phone number and password for login"
+      message:"Please provide email and password for login"
     })
   }
 
   //checkif user exist with given phone number
-  const user = await Users.findOne({ phoneNumber }).select('+password');
+  const user = await Users.findOne({ email }).select('+password');
   await user.comparePasswordInDB(password,user.password)
   //check if user exist & pasword matches
   if(!user || !(await user.comparePasswordInDB(password,user.password))){
     return res.status(400).json({
       status:'false',
-      message:"Incorrect phone number or password"
+      message:"Incorrect email or password"
     })
   }
   // Generate and send JWT token
@@ -572,6 +572,10 @@ catch(err){
 exports.resetPassword = async (req, res) => {
   const token = crypto.createHash('sha256').update(req.params.token).digest('hex')
   const user = await Users.findOne({passwordResetToken:token, passwordResetTokenExpires:{$gt:Date.now()} });
+  console.log(req.params.token);
+  console.log(token)
+  console.log(user);
+
 
   if(!user){
     return res.status(400).send({
