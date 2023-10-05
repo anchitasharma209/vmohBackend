@@ -9,7 +9,7 @@ const verifyToken = (req, res, next) => {
       if (err) {
         return res.status(403).json({
           status: false,
-          error: err.message, 
+          message: err.message, 
         });
       } else {
         req.decoded = decoded;
@@ -19,7 +19,7 @@ const verifyToken = (req, res, next) => {
   } else {
     return res.status(401).json({
       status: false,
-      error: 'No token provided', 
+      message: 'No token provided', 
     });
   }
 };

@@ -3,6 +3,8 @@ const bodyParser = require('body-parser');
 const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
+const fileUpload = require('express-fileupload');
+app.use(fileUpload());
 
 // DATABASE CONNECTIONS
 mongoose

@@ -9,6 +9,7 @@ const { generateOTP } = require("../utils/otp");
 const { sendSMS } = require("../utils/sms");
 const sendEmail = require("./../utils/email");
 const crypto = require("crypto");
+const path = require("path");
 
 // SIGN UP API creating new users
 exports.signUp = async (req, res) => {
@@ -70,6 +71,7 @@ exports.signUp = async (req, res) => {
       otp,
       otpExpiration,
       status: false,
+      isVerfied: false,
     });
     await user.save();
 
@@ -121,14 +123,27 @@ exports.verifyOtp = async (req, res) => {
         message: "OTP has expired",
       });
     }
+
     // OTP verified successfully, update the user document
     user.otp = "";
     user.status = true;
+    user.isVerfied = true;
     await user.save();
 
+    // Generate and send JWT token
+    const token = jwt.sign(
+      {
+        id: user._id,
+        companyName: user.companyName,
+        phoneNumber: user.phoneNumber,
+      },
+      secretKey,
+      { expiresIn: "2h" }
+    );
     return res.status(200).json({
       status: true,
       message: "OTP verified successfully.",
+      token,
     });
   } catch (err) {
     return res.status(500).json({
@@ -201,44 +216,63 @@ exports.login = async (req, res) => {
   // }
   const email = req.body.email;
   const password = req.body.password;
-  
+
   //check if phone number and password present in request body
-  if(!email || !password){
+  if (!email || !password) {
     return res.status(400).json({
-      status:false,
-      message:"Please provide email and password for login"
-    })
+      status: false,
+      message: "Please provide email and password for login",
+    });
   }
 
   //checkif user exist with given phone number
-  const user = await Users.findOne({ email }).select('+password');
-  await user.comparePasswordInDB(password,user.password)
-  //check if user exist & pasword matches
-  if(!user || !(await user.comparePasswordInDB(password,user.password))){
+  const user = await Users.findOne({ email }).select("+password");
+  if (!user) {
     return res.status(400).json({
-      status:'false',
-      message:"Incorrect email or password"
-    })
+      status: "false",
+      message: "No User Found",
+    });
+  }
+  if (!user.status) {
+    const otp = generateOTP();
+    const otpExpiration = moment().add(5, "minutes").toDate();
+    const message = `Your OTP for Verificaion is ${otp} and this is valid for 5 minutes`;
+    sendSMS(user.phoneNumber, message);
+    console.log(
+      `OTP for verify User At the login time if he is not Verfied ${otp}`
+    );
+    user.otp = otp;
+    user.otpExpiration = otpExpiration;
+    await user.save();
+    return res.status(400).json({
+      status: "false",
+      message: "Phone Number Not Verified",
+    });
+  }
+  await user.comparePasswordInDB(password, user.password);
+  //check if user exist & pasword matches
+  if (!user || !(await user.comparePasswordInDB(password, user.password))) {
+    return res.status(400).json({
+      status: "false",
+      message: "Incorrect email or password",
+    });
   }
   // Generate and send JWT token
-    const token = jwt.sign(
-      {
-        id: user._id,
-        companyName: user.companyName,
-        phoneNumber: user.phoneNumber,
-      },
-      secretKey,
-      { expiresIn: "2h" }
-    );
-
-
+  const token = jwt.sign(
+    {
+      id: user._id,
+      companyName: user.companyName,
+      phoneNumber: user.phoneNumber,
+    },
+    secretKey,
+    { expiresIn: "2h" }
+  );
 
   res.status(200).json({
-    status:'success',
+    status: "success",
     message: "Login successful",
     token,
-    user
-  })
+  });
 };
 
 // Reseting password by phoneNumber (NOT WOKRING)
@@ -305,39 +339,83 @@ exports.updateUser = async (req, res) => {
   try {
     const userId = req.decoded.id;
 
-    const { firstName, lastName, companyName } = req.body;
-    // Create an object with the fields to update
-    const updateFields = {};
-    if (firstName) {
-      updateFields.firstName = firstName;
-    }
-    if (lastName) {
-      updateFields.lastName = lastName;
-    }
-    if (companyName) {
-      updateFields.companyName = companyName;
-    }
-    // Use the _id filter to update the document
-    const updatedUser = await Users.updateOne(
-      { _id: new mongoose.Types.ObjectId(userId) },
-      { $set: updateFields }
-    );
+    // Check if req.files exists (file upload)
+    if (req.files && req.files.profilePicture) {
+      const uploadedFile = req.files.profilePicture;
+      const extension = path.extname(uploadedFile.name);
+      const file_name = "profile-" + Date.now() + extension;
+      const uploadPath = "./images/" + file_name; // Corrected path
 
-    if (updatedUser.nModified === 0) {
-      return res.status(404).json({
-        status: false,
-        message: "User not found",
+      uploadedFile.mv(uploadPath, async function (err) {
+        if (err) {
+          return res.status(500).json({
+            status: false,
+            message: err.message,
+          });
+        }
+
+        // Update the user document with profilePicture file_name
+        try {
+          const updatedUser = await Users.findOneAndUpdate(
+            { _id: userId },
+            { ...req.body, profilePicture: file_name },
+            { new: true } // To return the updated document
+          );
+
+          if (!updatedUser) {
+            return res.status(404).json({
+              status: false,
+              message: "User not found",
+            });
+          }
+
+          res.status(200).json({
+            status: true,
+            message: "UserDetails updated successfully",
+            data: updatedUser,
+          });
+        } catch (updateError) {
+          console.error(updateError);
+          return res.status(500).json({
+            status: false,
+            message: "Internal server error",
+          });
+        }
       });
+    } else {
+      // No file upload, directly update user details without profilePicture
+      try {
+        const updatedUser = await Users.findOneAndUpdate(
+          { _id: userId },
+          req.body,
+          { new: true } // To return the updated document
+        );
+
+        if (!updatedUser) {
+          return res.status(404).json({
+            status: false,
+            message: "User not found",
+          });
+        }
+
+        res.status(200).json({
+          status: true,
+          message: "UserDetails updated successfully",
+          data: updatedUser,
+        });
+      } catch (updateError) {
+        console.error(updateError);
+        return res.status(500).json({
+          status: false,
+          message: "Internal server error",
+        });
+      }
     }
-    res.status(200).json({
-      status: true,
-      message: "UserDetails  updated successfully",
-      data: updatedUser,
-    });
   } catch (err) {
-    return res.status(500).send({
+    console.error(err);
+    return res.status(500).json({
       status: false,
-      message: err.message,
+      message: "Internal server error",
     });
   }
 };
@@ -351,9 +429,21 @@ exports.generateOtp = async (req, res) => {
 
   const { phoneNumber } = req.body;
   try {
+    const alreadyUser = await Users.findOne({ phoneNumber: phoneNumber });
+    if (!alreadyUser) {
+      return res.status(500).json({
+        status: false,
+        message: "Error While Sending OTP",
+      });
+    }
     const otp = generateOTP();
-    const message = `Your OTP for resetting the password is ${otp}`;
+    const otpExpiration = moment().add(5, "minutes").toDate();
+    const message = `Your OTP for Reset Password is ${otp} and this is valid for 5 minutes`;
     sendSMS(phoneNumber, message);
+    alreadyUser.otp = otp;
+    alreadyUser.otpExpiration = otpExpiration;
+    await alreadyUser.save();
+    console.log(`OTP for Testing Resend OTP is ${otp} , 5 mins valid`);
 
     return res.status(200).json({
       status: true,
@@ -371,7 +461,10 @@ exports.getProfile = (req, res) => {
   try {
     const user = req.decoded;
 
-    Users.findOne({ _id: user.id }).then((data) => {
+    Users.findOne(
+      { _id: user.id },
+      { password: 0, otp: 0, otpExpiration: 0, confirmPassword: 0 }
+    ).then((data) => {
       if (!data) {
         return res.status(404).json({
           status: false,
@@ -524,61 +617,61 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
-
-
 // reseting password
-exports.forgotPassword = async (req,res,next)=>{
+exports.forgotPassword = async (req, res, next) => {
   //1 get user based on posted email
- const user = await Users.findOne({email:req.body.email})
- if(!user){
-  return res.status(404).send({
-    message:"User Not Found"
-  })
- }
-//2 create a random reset token
- const resetToken = user.createResetPasswordToken();
- await user.save({validateBeforeSave:false});
+  const user = await Users.findOne({ email: req.body.email });
+  if (!user) {
+    return res.status(404).send({
+      message: "User Not Found",
+    });
+  }
+  //2 create a random reset token
+  const resetToken = user.createResetPasswordToken();
+  await user.save({ validateBeforeSave: false });
 
- //3 send the token back to user email
- //const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/reset-password/${resetToken}`
- const resetUrl = `http://localhost:5173/reset-password/${resetToken}`
- const message = `Please use the below link to reset your password\n\n${resetUrl}\n\nThis reset Password link will be valid for 10 minutes`
- //console.log(message);
-try{
+  //3 send the token back to user email
+  //const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/reset-password/${resetToken}`
+  const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+  const message = `Please use the below link to reset your password\n\n${resetUrl}\n\nThis reset Password link will be valid for 10 minutes`;
+  //console.log(message);
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Password changes request recieved",
+      message: message,
+    });
 
-await sendEmail({
-  email:user.email,
-  subject: "Password changes request recieved",
-  message: message
+    res.status(200).json({
+      status: "Success",
+      message: "Password reset link send to user email",
+      user,
+    });
+  } catch (err) {
+    user.passwordResetToken = undefined;
+    user.passwordResetTokenExpires = undefined;
+    user.save({ validateBeforeSave: false });
+
+    return res.status(500).send({
+      message: "There was an error sending message",
+    });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const token = crypto
+    .createHash("sha256")
+    .update(req.params.token)
+    .digest("hex");
+  const user = await Users.findOne({
+    passwordResetToken: token,
+    passwordResetTokenExpires: { $gt: Date.now() },
   });
 
-  res.status(200).json({
-  status:"Success",
-  message:"Password reset link send to user email",
-  user
- })
-}
-catch(err){
-  user.passwordResetToken = undefined;
-  user.passwordResetTokenExpires = undefined;
-  user.save({validateBeforeSave:false});
-
-
-  return res.status(500).send({
-    message:"There was an error sending message"
-  })
-}
-}
-exports.resetPassword = async (req, res) => {
-  const token = crypto.createHash('sha256').update(req.params.token).digest('hex')
-  const user = await Users.findOne({passwordResetToken:token, passwordResetTokenExpires:{$gt:Date.now()} });
-  
-
-
-  if(!user){
+  if (!user) {
     return res.status(400).send({
-      message:"Token is invalid or has expired"
-    })
+      message: "Token is invalid or has expired",
+    });
   }
   //resetting the password
   user.password = req.body.password;
@@ -586,9 +679,9 @@ exports.resetPassword = async (req, res) => {
   // Clear reset token fields
   user.passwordResetToken = undefined;
   user.passwordResetTokenExpires = undefined;
-  
+
   user.save();
-   // login the user
+  // login the user
   const loginToken = jwt.sign(
     {
       id: user._id,
@@ -599,16 +692,11 @@ exports.resetPassword = async (req, res) => {
     { expiresIn: "2h" }
   );
   return res.status(200).send({
-    status:"true",
-    message:"Password reset Successfully",
-    token:loginToken
-
-  })
-
-
-
-
-}
+    status: "true",
+    message: "Password reset Successfully",
+    token: loginToken,
+  });
+};
 
 exports.resetPasswordTokens = async (req, res) => {
   const { token } = req.params;
