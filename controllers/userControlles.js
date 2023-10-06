@@ -144,6 +144,7 @@ exports.verifyOtp = async (req, res) => {
       status: true,
       message: "OTP verified successfully.",
       token,
+      isVerfied: user.isVerfied,
     });
   } catch (err) {
     return res.status(500).json({
@@ -247,6 +248,7 @@ exports.login = async (req, res) => {
     return res.status(400).json({
       status: "false",
       message: "Phone Number Not Verified",
+      phoneNumber: user.phoneNumber,
     });
   }
   await user.comparePasswordInDB(password, user.password);
@@ -271,6 +273,7 @@ exports.login = async (req, res) => {
   res.status(200).json({
     status: "success",
     message: "Login successful",
+    isVerfied: user.isVerfied,
     token,
   });
 };
