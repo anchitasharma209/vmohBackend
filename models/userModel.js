@@ -35,25 +35,9 @@ const userSchema = new mongoose.Schema(
     deleted: { type: Boolean, default: false },
     isVerfied: { type: Boolean, default: false },
     socialLinks: {
-      type: Map,
-      of: String,
-      validate: {
-        validator: function (socialLinks) {
-          const validPlatforms = [
-            "LinkedIn",
-            "Twitter",
-            "Facebook",
-            "Instagram",
-          ];
-          for (const platform of Object.keys(socialLinks)) {
-            if (!validPlatforms.includes(platform)) {
-              return false;
-            }
-          }
-          return true;
-        },
-        message: "Invalid social platform name.",
-      },
+      LinkedIn: { type: String },
+      Twitter: { type: String },
+      Facebook: { type: String },
     },
   },
   { timestamps: true }
