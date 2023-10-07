@@ -217,6 +217,12 @@ exports.login = async (req, res) => {
       status: "success",
       message: "Login successful",
       isVerfied: user.isVerfied,
+      data: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        companyName: user.companyName,
+        profilePicture: user.profilePicture,
+      },
       token,
     });
   } catch (err) {
