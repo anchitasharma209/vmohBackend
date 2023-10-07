@@ -285,9 +285,10 @@ exports.updatePasswordsss = (req, res) => {
     });
 };
 
-/*  Updating user details
+/*  Updating user details NOT USING (WORKING FINE USING full req.body and updating directly)
+checking if socialLInks is provided in object form with multple (3) validations check
  */
-exports.updateUser = async (req, res) => {
+exports.updateUser_NOTUSING = async (req, res) => {
   try {
     const userId = req.decoded.id;
     let socialLinks = {};
@@ -430,6 +431,107 @@ function parseSocialLinks(socialLinks, contentType) {
     return JSON.parse(socialLinks);
   }
 }
+
+// Updating user with social links not directly
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = req.decoded.id;
+    const Instagram = req.body.Instagram;
+    const Twitter = req.body.Twitter;
+    const Facebook = req.body.Facebook;
+    let socialLinks = {
+      Instagram,
+      Twitter,
+      Facebook,
+    };
+
+    if (req.files && req.files.profilePicture) {
+      const uploadedFile = req.files.profilePicture;
+      const extension = path.extname(uploadedFile.name);
+      const file_name = "profile-" + Date.now() + extension;
+      const uploadPath = "./images/" + file_name;
+
+      uploadedFile.mv(uploadPath, async function (err) {
+        if (err) {
+          return res.status(500).json({
+            status: false,
+            message: err.message,
+          });
+        }
+
+        // Update the user document with profilePicture file_name
+        try {
+          const updatedUser = await Users.findOneAndUpdate(
+            { _id: userId },
+            {
+              ...req.body,
+              profilePicture: file_name,
+              socialLinks: socialLinks,
+            },
+            { new: true }
+          );
+
+          if (!updatedUser) {
+            return res.status(404).json({
+              status: false,
+              message: "User not found",
+            });
+          }
+
+          res.status(200).json({
+            status: true,
+            message: "UserDetails updated successfully",
+            data: updatedUser,
+          });
+        } catch (updateError) {
+          console.error(updateError);
+          return res.status(500).json({
+            status: false,
+            message: "Internal server error",
+          });
+        }
+      });
+    } else {
+      // No file upload, directly update user details without profilePicture
+      try {
+        const updatedUser = await Users.findOneAndUpdate(
+          { _id: userId },
+          {
+            ...req.body,
+            socialLinks: socialLinks,
+          },
+          { new: true }
+        );
+
+        if (!updatedUser) {
+          return res.status(404).json({
+            status: false,
+            message: "User not found",
+          });
+        }
+
+        res.status(200).json({
+          status: true,
+          message: "UserDetails updated successfully",
+          data: updatedUser,
+        });
+      } catch (updateError) {
+        console.error(updateError);
+        return res.status(500).json({
+          status: false,
+          message: "Internal server error",
+        });``
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: false,
+      message: "Internal server error",
+    });
+  }
+};
+
 
 // API for Generating random 6 digits OTP (NOT USING NOW)
 exports.generateOtp = async (req, res) => {
