@@ -82,7 +82,6 @@ exports.signUp = async (req, res) => {
     return res.status(200).send({
       status: true,
       message: "OTP has been sent. Please verify your Number!",
-      data: user,
     });
   } catch (err) {
     return res.status(500).send({
@@ -143,6 +142,12 @@ exports.verifyOtp = async (req, res) => {
     return res.status(200).json({
       status: true,
       message: "OTP verified successfully.",
+      data: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        companyName: user.companyName,
+        profilePicture: user.profilePicture,
+      },
       token,
       isVerfied: user.isVerfied,
     });

@@ -34,6 +34,7 @@ const userSchema = new mongoose.Schema(
     status: { type: Boolean, default: false },
     deleted: { type: Boolean, default: false },
     isVerfied: { type: Boolean, default: false },
+    description: { type: String },
     socialLinks: {
       Instagram: { type: String },
       Twitter: { type: String },
