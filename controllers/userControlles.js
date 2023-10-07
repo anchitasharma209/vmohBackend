@@ -290,13 +290,56 @@ exports.updatePasswordsss = (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.decoded.id;
+    let socialLinks = {};
+    function checkSocialLinksFormat(req) {
+      const keys = Object.keys(req.body);
 
-    // Check if req.files exists (file upload)
+      // Check if any key matches the format 'socialLinks[...]'
+      const hasSocialLinksFormat = keys.some((key) =>
+        /^socialLinks\[[^\]]+\]$/.test(key)
+      );
+
+      return hasSocialLinksFormat;
+    }
+
+    let socialLinksObjType = checkSocialLinksFormat(req);
+    // Check if the request body is in FormData format
+    if (
+      req.headers["content-type"] &&
+      req.headers["content-type"].includes("multipart/form-data") &&
+      !socialLinksObjType
+    ) {
+      // Parse socialLinks from FormData
+      socialLinks = parseSocialLinks(
+        req.body.socialLinks,
+        req.headers["content-type"]
+      );
+    } else if (
+      req.headers["content-type"] &&
+      req.headers["content-type"].includes("application/json")
+    ) {
+      // If the content-type is application/json,
+      socialLinks = req.body.socialLinks;
+    } else if (socialLinksObjType) {
+      for (const key in req.body) {
+        if (key.startsWith("socialLinks[") && key.endsWith("]")) {
+          const fieldName = key.slice(12, -1); // Extract the field name from the key
+          socialLinks[fieldName] = req.body[key];
+        }
+      }
+    } else {
+      return res.status(400).send({
+        status: false,
+        message: "Something Wrong with SocalLinks",
+      });
+    }
+
+    // console.log(socialLinks, "ABCD");
     if (req.files && req.files.profilePicture) {
       const uploadedFile = req.files.profilePicture;
       const extension = path.extname(uploadedFile.name);
       const file_name = "profile-" + Date.now() + extension;
-      const uploadPath = "./images/" + file_name; // Corrected path
+      const uploadPath = "./images/" + file_name;
 
       uploadedFile.mv(uploadPath, async function (err) {
         if (err) {
@@ -310,8 +353,12 @@ exports.updateUser = async (req, res) => {
         try {
           const updatedUser = await Users.findOneAndUpdate(
             { _id: userId },
-            { ...req.body, profilePicture: file_name },
-            { new: true } // To return the updated document
+            {
+              ...req.body,
+              profilePicture: file_name,
+              socialLinks: socialLinks,
+            },
+            { new: true }
           );
 
           if (!updatedUser) {
@@ -339,8 +386,11 @@ exports.updateUser = async (req, res) => {
       try {
         const updatedUser = await Users.findOneAndUpdate(
           { _id: userId },
-          req.body,
-          { new: true } // To return the updated document
+          {
+            ...req.body,
+            socialLinks: socialLinks,
+          },
+          { new: true }
         );
 
         if (!updatedUser) {
@@ -371,6 +421,15 @@ exports.updateUser = async (req, res) => {
     });
   }
 };
+
+// Parsing Social Link
+function parseSocialLinks(socialLinks, contentType) {
+  if (contentType && contentType.includes("application/json")) {
+    return socialLinks;
+  } else {
+    return JSON.parse(socialLinks);
+  }
+}
 
 // API for Generating random 6 digits OTP (NOT USING NOW)
 exports.generateOtp = async (req, res) => {

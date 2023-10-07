@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
     deleted: { type: Boolean, default: false },
     isVerfied: { type: Boolean, default: false },
     socialLinks: {
-      LinkedIn: { type: String },
+      Instagram: { type: String },
       Twitter: { type: String },
       Facebook: { type: String },
     },
